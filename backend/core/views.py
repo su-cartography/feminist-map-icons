@@ -2,7 +2,8 @@ from django.db.models import Q
 from rest_framework import viewsets
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from .models import Icon
 from .serializers import IconSerializer
 
@@ -16,6 +17,7 @@ def health(request):
 # Handles list, detail, create, update, and delete for icons.
 class IconViewSet(viewsets.ModelViewSet):
     serializer_class = IconSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]
     # Use unique_id in the URL instead of the numeric database id
     # e.g. /api/icons/00e8059e/
     lookup_field = "unique_id"

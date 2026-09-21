@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "corsheaders",
     "core",
+    "rest_framework.authtoken",
 ]
 
 MIDDLEWARE = [
@@ -143,3 +144,14 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
+
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",  # useful for /admin and browsable API
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticatedOrReadOnly",
+    ],
+}
