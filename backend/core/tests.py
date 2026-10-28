@@ -37,6 +37,14 @@ def icon_url(unique_id, suffix=None):
     return reverse(name, kwargs={"unique_id": unique_id})
 
 
+def list_rows(response):
+    """List payloads are paginated: {count, next, previous, results}."""
+    data = response.data
+    if isinstance(data, dict) and "results" in data:
+        return data["results"]
+    return data
+
+
 class IconPermissionTests(APITestCase):
     """The two holes found by hand on 2026-10-01: publish-bypass and delete-anything."""
 
@@ -270,7 +278,8 @@ class IconVisibilityTests(APITestCase):
         )
 
     def listed_ids(self):
-        return {row["unique_id"] for row in self.client.get(reverse("icon-list")).data}
+        response = self.client.get(reverse("icon-list"))
+        return {row["unique_id"] for row in list_rows(response)}
 
     def test_anonymous_sees_only_published(self):
         self.assertEqual(self.listed_ids(), {"pub1"})
@@ -332,7 +341,7 @@ class IconSearchTests(APITestCase):
         )
 
     def ids(self, response):
-        return sorted(row["unique_id"] for row in response.data)
+        return sorted(row["unique_id"] for row in list_rows(response))
 
     def test_search_matches_primary_tag(self):
         response = self.client.get(reverse("icon-list"), {"q": "park"})
@@ -359,6 +368,41 @@ class IconSearchTests(APITestCase):
         self.client.force_authenticate(self.author)
         response = self.client.get(reverse("icon-list"), {"q": "park"})
         self.assertIn("park_draft", self.ids(response))
+
+
+class IconPaginationTests(APITestCase):
+    """GET /api/icons/ must return page-sized payloads, not the full table."""
+
+    @classmethod
+    def setUpTestData(cls):
+        for i in range(51):
+            Icon.objects.create(
+                unique_id=f"page{i:02d}",
+                primary_tag="park" if i < 5 else "bench",
+                status=Icon.Status.PUBLISHED,
+            )
+
+    def test_list_is_paginated_to_page_size(self):
+        response = self.client.get(reverse("icon-list"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 51)
+        self.assertEqual(len(response.data["results"]), 50)
+        self.assertIsNotNone(response.data["next"])
+        self.assertIsNone(response.data["previous"])
+
+    def test_second_page_returns_the_remainder(self):
+        response = self.client.get(reverse("icon-list"), {"page": 2})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertIsNotNone(response.data["previous"])
+        self.assertIsNone(response.data["next"])
+
+    def test_search_stays_paginated(self):
+        response = self.client.get(reverse("icon-list"), {"q": "park"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 5)
+        self.assertEqual(len(response.data["results"]), 5)
+        self.assertIn("results", response.data)
 
 
 class HealthTests(APITestCase):

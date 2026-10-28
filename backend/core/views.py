@@ -50,7 +50,8 @@ class IconViewSet(viewsets.ModelViewSet):
     # list/retrieve, so a write can never reach a row the caller cannot see.
     def get_queryset(self):
         # Load icons and their secondary tags in an efficient way
-        qs = Icon.objects.prefetch_related("tags").all()
+        # order_by keeps page boundaries stable; DRF warns if the list queryset is unordered.
+        qs = Icon.objects.prefetch_related("tags").order_by("unique_id")
 
         user = self.request.user
         if not is_moderator(user):
