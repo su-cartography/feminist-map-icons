@@ -1094,3 +1094,167 @@ class IconUploadValidationTests(APITestCase):
         )
         icon.refresh_from_db()
         self.assertEqual(icon.png_file.name, "icons/png/imported1.png")
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp(prefix="icon-media-tests-"))
+class IconMediaAccessTests(APITestCase):
+    """Issue #18: the PNG/SVG of an unpublished icon must be as invisible as its row.
+
+    Before this, every file under MEDIA_ROOT was served at a guessable /media/ path with
+    no check at all, so the row-level rules the other tests here prove were one filename
+    away from being bypassed."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.author = in_role(User.objects.create_user("mediaowner", password="pw"), CONTRIBUTOR)
+        cls.other = in_role(User.objects.create_user("mediaother", password="pw"), CONTRIBUTOR)
+        cls.moderator = in_role(
+            User.objects.create_user("mediamod", password="pw", is_staff=True), MODERATOR
+        )
+
+        cls.published = Icon.objects.create(
+            unique_id="pubmedia",
+            primary_tag="park",
+            status=Icon.Status.PUBLISHED,
+            png_file=SimpleUploadedFile("pub.png", minimal_png(), content_type="image/png"),
+            svg_file=SimpleUploadedFile("pub.svg", MINIMAL_SVG, content_type="image/svg+xml"),
+        )
+        # In the review queue, so its files are readable by its author and moderators only.
+        cls.pending = Icon.objects.create(
+            unique_id="pendmedia",
+            primary_tag="bench",
+            status=Icon.Status.PENDING,
+            created_by=cls.author,
+            png_file=SimpleUploadedFile("pend.png", minimal_png(), content_type="image/png"),
+            svg_file=SimpleUploadedFile("pend.svg", MINIMAL_SVG, content_type="image/svg+xml"),
+        )
+        # Published, but metadata only -- plenty of the imported rows look like this.
+        cls.fileless = Icon.objects.create(
+            unique_id="nomedia",
+            primary_tag="well",
+            status=Icon.Status.PUBLISHED,
+        )
+
+    def fetch(self, user, unique_id, kind, **extra):
+        if user is not None:
+            self.client.force_authenticate(user)
+        return self.client.get(icon_url(unique_id, kind), **extra)
+
+    def body(self, response):
+        return b"".join(response.streaming_content)
+
+    # --- published files stay public ------------------------------------------------
+
+    def test_a_published_png_is_served_to_anyone(self):
+        response = self.fetch(None, "pubmedia", "png")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["Content-Type"], "image/png")
+        self.assertEqual(self.body(response), minimal_png())
+
+    def test_a_published_svg_is_served_to_anyone(self):
+        response = self.fetch(None, "pubmedia", "svg")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["Content-Type"], "image/svg+xml")
+        self.assertEqual(self.body(response), MINIMAL_SVG)
+
+    def test_a_client_asking_precisely_for_image_png_is_still_served(self):
+        """DRF negotiates a renderer before the handler; JSON is the only one configured."""
+        response = self.fetch(None, "pubmedia", "png", HTTP_ACCEPT="image/png")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    # --- unpublished files are not -------------------------------------------------
+
+    def test_a_pending_icons_png_is_not_public(self):
+        response = self.fetch(None, "pendmedia", "png")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_a_pending_icons_svg_is_not_public(self):
+        response = self.fetch(None, "pendmedia", "svg")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_another_contributor_cannot_read_a_pending_icons_file(self):
+        """404, not 403: the row itself is invisible, so saying "forbidden" would confirm
+        that an icon with that id exists."""
+        response = self.fetch(self.other, "pendmedia", "png")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_the_owner_can_read_their_own_pending_file(self):
+        response = self.fetch(self.author, "pendmedia", "png")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(self.body(response), minimal_png())
+
+    def test_a_moderator_can_read_a_pending_file_for_review(self):
+        response = self.fetch(self.moderator, "pendmedia", "svg")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(self.body(response), MINIMAL_SVG)
+
+    def test_a_file_withdrawn_from_publication_stops_being_public(self):
+        """The check reads the row's status at request time, not at upload time."""
+        self.published.status = Icon.Status.CHANGES_REQUESTED
+        self.published.save(update_fields=["status"])
+        self.assertEqual(
+            self.fetch(None, "pubmedia", "png").status_code, status.HTTP_404_NOT_FOUND
+        )
+
+    # --- the raw /media/ path is gone ----------------------------------------------
+
+    @override_settings(DEBUG=True)
+    def test_the_raw_media_path_is_not_served_even_with_debug_on(self):
+        """static() under DEBUG was the hole: it published MEDIA_ROOT with no checks."""
+        response = self.client.get(settings.MEDIA_URL + self.pending.png_file.name)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_the_detail_response_points_at_the_gated_endpoint(self):
+        response = self.client.get(icon_url("pubmedia"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["png_file"].endswith("/api/icons/pubmedia/png/"))
+        self.assertTrue(response.data["svg_file"].endswith("/api/icons/pubmedia/svg/"))
+
+    def test_no_response_hands_out_a_media_path(self):
+        for url in (reverse("icon-list"), icon_url("pubmedia")):
+            with self.subTest(url=url):
+                self.assertNotIn(b"/media/", self.client.get(url).content)
+
+    def test_an_icon_with_no_file_reports_null_rather_than_a_url(self):
+        response = self.client.get(icon_url("nomedia"))
+        self.assertIsNone(response.data["png_file"])
+        self.assertIsNone(response.data["svg_file"])
+
+    # --- how the bytes are sent -----------------------------------------------------
+
+    def test_an_svg_is_served_as_a_download(self):
+        """An SVG can carry a <script>; inline on this origin it would run with the API's
+        own session cookie. An <img src> renders it regardless, and runs no script."""
+        response = self.fetch(None, "pubmedia", "svg")
+        self.assertIn("attachment", response["Content-Disposition"])
+        self.assertEqual(response["X-Content-Type-Options"], "nosniff")
+
+    def test_a_png_is_served_inline(self):
+        response = self.fetch(None, "pubmedia", "png")
+        self.assertNotIn("attachment", response.get("Content-Disposition", ""))
+
+    def test_an_unpublished_file_is_kept_out_of_shared_caches(self):
+        response = self.fetch(self.author, "pendmedia", "png")
+        self.assertIn("no-store", response["Cache-Control"])
+
+    def test_a_published_file_is_left_cacheable(self):
+        response = self.fetch(None, "pubmedia", "png")
+        self.assertNotIn("no-store", response.get("Cache-Control", ""))
+
+    # --- the endpoints are read-only ------------------------------------------------
+
+    def test_an_icon_with_no_png_is_a_404(self):
+        self.assertEqual(
+            self.fetch(None, "nomedia", "png").status_code, status.HTTP_404_NOT_FOUND
+        )
+
+    def test_a_row_whose_file_vanished_from_storage_is_a_404_not_a_500(self):
+        Path(self.published.png_file.path).unlink()
+        self.assertEqual(
+            self.fetch(None, "pubmedia", "png").status_code, status.HTTP_404_NOT_FOUND
+        )
+
+    def test_the_file_endpoints_do_not_accept_writes(self):
+        self.client.force_authenticate(self.author)
+        response = self.client.post(icon_url("pendmedia", "png"))
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)

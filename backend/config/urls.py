@@ -17,14 +17,14 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path
-from django.conf import settings
-from django.conf.urls.static import static
 from django.urls import include
 
+# MEDIA_ROOT is  not served here. static() publishes every file under it at a
+# guessable /media/ path with no check of the icon's status or its owner, so the artwork of
+# an icon still in review was readable by anyone (issue #18). Icon files are served by
+# /api/icons/<unique_id>/png/ and /svg/ instead, which run the same visibility rules as the
+# rest of the API. Nothing else lives under media/, so nothing else lost a URL.
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include("core.urls")),
 ]
-
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

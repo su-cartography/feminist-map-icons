@@ -1,4 +1,6 @@
 from rest_framework import serializers
+from rest_framework.reverse import reverse
+
 from .models import Icon, Tag
 
 
@@ -79,6 +81,26 @@ class IconSerializer(serializers.ModelSerializer):
         icon = super().update(instance, validated_data)
         self._set_tags(icon, tag_names)
         return icon
+
+    # Reading: hand out the gated file URLs, never the raw MEDIA_URL path the FileField
+    # would produce by itself. The field names stay as they are -- a client still finds 
+    # the file under "png_file".
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["png_file"] = self._file_url(instance, "png")
+        data["svg_file"] = self._file_url(instance, "svg")
+        return data
+
+    def _file_url(self, instance, kind):
+        
+        if not getattr(instance, f"{kind}_file"):
+            return None
+        
+        return reverse(
+            f"icon-{kind}",
+            kwargs={"unique_id": instance.unique_id},
+            request=self.context.get("request"),
+        )
 
 
 # Body of POST /api/icons/<unique_id>/review/

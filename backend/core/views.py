@@ -1,9 +1,13 @@
+from pathlib import Path
+
 from django.db.models import Q
+from django.http import FileResponse
 from rest_framework import status as http_status
 from rest_framework import viewsets
 from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.permissions import AllowAny
+from rest_framework.renderers import BaseRenderer
 from rest_framework.response import Response
 from .models import Icon
 from .permissions import IsContributorOrReadOnly, IsOwnerOrModerator, IsReviewer
@@ -18,6 +22,18 @@ from .serializers import IconSerializer, IconStatusSerializer
 @permission_classes([AllowAny])
 def health(request):
     return Response({"status": "ok"})
+
+
+# The icon file endpoints answer with bytes, not JSON. DRF picks a renderer before the
+# handler runs, and JSON is the only one configured project-wide so, a client asking
+# precisely for "Accept: image/png" would be told 406 before it reached the file.
+class IconFileRenderer(BaseRenderer):
+    media_type = "*/*"
+    format = "file"
+    charset = None
+
+    def render(self, data, *args, **kwargs):
+        return data
 
 
 # Handles list, detail, create, update, and delete for icons.
@@ -123,3 +139,51 @@ class IconViewSet(viewsets.ModelViewSet):
         icon.status = new_status
         icon.save(update_fields=["status", "updated_at"])
         return Response(self.get_serializer(icon).data)
+
+    # GET /api/icons/<unique_id>/png/   and   GET /api/icons/<unique_id>/svg/
+    # The files are served through the API rather than straight off /media/, because a raw
+    # file path ha no status and no owner; anyone who knew or guessed the path could read
+    # artwork that is still in review. These go through get_object(), so a file is
+    # as visible as the row it belongs to -- published to everyone, unpublished to its
+    # owner and to moderators, invisible (404, not 403) to anyone else.
+    @action(detail=True, methods=["get"], renderer_classes=[IconFileRenderer])
+    def png(self, request, unique_id=None):
+        return self._serve_file(self.get_object(), "png_file", "image/png")
+
+    @action(detail=True, methods=["get"], renderer_classes=[IconFileRenderer])
+    def svg(self, request, unique_id=None):
+        return self._serve_file(self.get_object(), "svg_file", "image/svg+xml")
+
+    # An SVG is markup, not a bitmap: it can carry a <script>, and served inline from this
+    # origin that script would run with the API's own session cookie. Sending it as a
+    # download stops a direct visit from rendering it, while the gallery is unaffected --
+    # Content-Disposition is ignored for an <img src>, and an SVG in an <img> runs no
+    # script.
+    SERVE_AS_DOWNLOAD = ("image/svg+xml",)
+
+    def _serve_file(self, icon, field_name, content_type):
+        stored = getattr(icon, field_name)
+        if not stored:
+            raise NotFound(f"This icon has no {field_name.split('_')[0].upper()} file.")
+
+        try:
+            handle = stored.open("rb")
+        except FileNotFoundError:
+            # The row says there is a file and storage disagrees -- a 500 here would read
+            # as an outage rather than as the one missing file it is.
+            raise NotFound("The file for this icon is missing from storage.")
+
+        response = FileResponse(
+            handle,
+            content_type=content_type,
+            filename=Path(stored.name).name,
+            as_attachment=content_type in self.SERVE_AS_DOWNLOAD,
+        )
+        # Say what the bytes are and have the browser believe it, rather than sniffing a
+        # different type out of the content.
+        response["X-Content-Type-Options"] = "nosniff"
+        if icon.status != Icon.Status.PUBLISHED:
+            # Whether this file is readable depends on who asked, so it can't be held
+            # in any shared cache and handed to the next person.
+            response["Cache-Control"] = "private, no-store"
+        return response
