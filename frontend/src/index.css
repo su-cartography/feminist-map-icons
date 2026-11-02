@@ -1,18 +1,26 @@
 :root {
-  --ink: #1a2421;
-  --muted: #5c6b66;
-  --paper: #f3f1ec;
-  --surface: #ffffff;
-  --line: #d5d2c8;
-  --accent: #0f6b5c;
-  --accent-soft: #e3f0ed;
-  --sans: 'Segoe UI', system-ui, sans-serif;
+  --purple: #5b3d9a;
+  --purple-soft: #f3eef9;
+  --pink: #e85a8c;
+  --pink-soft: #f8d4e0;
+  --yellow: #e8c547;
+  --ink: #1a1a1a;
+  --muted: #555;
+  --border: #ddd;
+  --max: 72rem;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --sans: 'Source Sans 3', 'Segoe UI', system-ui, sans-serif;
+  --display: 'Fraunces', Georgia, serif;
 
   font-family: var(--sans);
   line-height: 1.5;
   font-weight: 400;
   color: var(--ink);
-  background: var(--paper);
+  background:
+    radial-gradient(ellipse 80% 50% at 10% -10%, rgba(91, 61, 154, 0.12), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(232, 197, 71, 0.18), transparent 50%),
+    #fff;
+  background-attachment: fixed;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -25,6 +33,10 @@
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
   min-width: 320px;
@@ -35,20 +47,36 @@ body {
   min-height: 100vh;
 }
 
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
 a {
-  color: inherit;
+  color: var(--purple);
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 2px;
 }
 
 h1,
 h2,
+h3,
 p {
   margin-top: 0;
 }
 
-code {
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 0.95em;
-  background: var(--accent-soft);
-  padding: 0.1em 0.35em;
-  border-radius: 4px;
+ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
