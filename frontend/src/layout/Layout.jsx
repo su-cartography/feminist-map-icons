@@ -1,12 +1,21 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import logo from '../assets/logo.png'
 
 const navClass = ({ isActive }) =>
   isActive ? 'site-nav__link is-active' : 'site-nav__link'
 
+function scrollToGallery() {
+  document.getElementById('gallery')?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start',
+  })
+}
+
 export default function Layout() {
   const [scrolled, setScrolled] = useState(false)
+  const location = useLocation()
+  const navigate = useNavigate()
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8)
@@ -14,6 +23,15 @@ export default function Layout() {
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
+
+  function handleSearchClick(event) {
+    event.preventDefault()
+    if (location.pathname === '/') {
+      scrollToGallery()
+      return
+    }
+    navigate({ pathname: '/', hash: 'gallery' })
+  }
 
   return (
     <div className="site">
@@ -27,9 +45,13 @@ export default function Layout() {
             <span>Gallery of Possibilities</span>
           </NavLink>
           <nav className="site-nav" aria-label="Main">
-            <NavLink to="/gallery" className={navClass}>
+            <a
+              href="/#gallery"
+              className="site-nav__link"
+              onClick={handleSearchClick}
+            >
               Search
-            </NavLink>
+            </a>
             <NavLink to="/resources" className={navClass}>
               Resources
             </NavLink>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import logo from '../assets/logo.png'
 import qgisPreview from '../assets/qgis-preview.png'
 
@@ -30,7 +30,15 @@ const ABOUT_CARDS = [
   },
 ]
 
+function scrollToGallery() {
+  document.getElementById('gallery')?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start',
+  })
+}
+
 export default function HomePage() {
+  const location = useLocation()
   const [previewIcons, setPreviewIcons] = useState([])
   const [previewStatus, setPreviewStatus] = useState('loading')
 
@@ -58,6 +66,14 @@ export default function HomePage() {
     }
   }, [])
 
+  useEffect(() => {
+    if (location.hash === '#gallery') {
+      // Wait a tick so layout/images can settle before scrolling.
+      const timer = window.setTimeout(scrollToGallery, 50)
+      return () => window.clearTimeout(timer)
+    }
+  }, [location.hash])
+
   return (
     <div className="home">
       <section className="hero wrap">
@@ -69,9 +85,12 @@ export default function HomePage() {
           A feminist map icon gallery and QGIS plugin.
         </p>
         <div className="actions">
-          <Link className="btn btn-yellow" to="/gallery">
+          <a className="btn btn-yellow" href="#gallery" onClick={(event) => {
+            event.preventDefault()
+            scrollToGallery()
+          }}>
             Search
-          </Link>
+          </a>
           <Link className="btn" to="/resources">
             Resources
           </Link>
@@ -97,18 +116,29 @@ export default function HomePage() {
               practice that can be integrated into QGIS, an open-source mapping
               platform, and cartography more broadly.
             </p>
-            <Link className="btn" to="/gallery">
+            <a
+              className="btn"
+              href="#gallery"
+              onClick={(event) => {
+                event.preventDefault()
+                scrollToGallery()
+              }}
+            >
               Search icons
-            </Link>
+            </a>
           </div>
         </div>
       </section>
 
-      <section className="home-gallery wrap" aria-labelledby="home-gallery-heading">
+      <section
+        id="gallery"
+        className="home-gallery wrap"
+        aria-labelledby="home-gallery-heading"
+      >
         <h2 id="home-gallery-heading">Browse the library</h2>
         <p>
-          A sample of published icons from the API. Open Search for the full
-          gallery.
+          Published icons from the API. Use Search in the header to jump back
+          here anytime.
         </p>
         {previewStatus === 'loading' && (
           <p className="home-gallery__status">Loading icons…</p>
@@ -122,7 +152,7 @@ export default function HomePage() {
         {previewStatus === 'empty' && (
           <p className="home-gallery__status">
             No published icons yet. Import icons on the backend to populate this
-            preview.
+            gallery.
           </p>
         )}
         {previewStatus === 'ready' && (
@@ -151,11 +181,6 @@ export default function HomePage() {
             ))}
           </ul>
         )}
-        <div className="actions">
-          <Link className="btn btn-yellow" to="/gallery">
-            Open gallery
-          </Link>
-        </div>
       </section>
 
       <section className="about wrap" aria-labelledby="about-heading">
