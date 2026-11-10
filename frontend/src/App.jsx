@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Layout from './layout/Layout'
 import ContributePage from './pages/ContributePage'
 import GalleryPage from './pages/GalleryPage'
@@ -8,16 +8,27 @@ import ResourcesPage from './pages/ResourcesPage'
 import './App.css'
 
 export default function App() {
+  const location = useLocation()
+  const background = location.state?.backgroundLocation
+
   return (
-    <Routes>
-      <Route path="/" element={<Layout />}>
-        <Route index element={<HomePage />} />
-        <Route path="gallery" element={<GalleryPage />} />
-        <Route path="icons/:uniqueId" element={<IconDetailPage />} />
-        <Route path="resources" element={<ResourcesPage />} />
-        <Route path="contribute" element={<ContributePage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Route>
-    </Routes>
+    <>
+      <Routes location={background || location}>
+        <Route path="/" element={<Layout />}>
+          <Route index element={<HomePage />} />
+          <Route path="gallery" element={<GalleryPage />} />
+          <Route path="icons/:uniqueId" element={<IconDetailPage />} />
+          <Route path="resources" element={<ResourcesPage />} />
+          <Route path="contribute" element={<ContributePage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
+
+      {background && (
+        <Routes>
+          <Route path="/icons/:uniqueId" element={<IconDetailPage />} />
+        </Routes>
+      )}
+    </>
   )
 }

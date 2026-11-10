@@ -287,7 +287,10 @@ export default function HomePage() {
                     <Link
                       className="icon-card"
                       to={`/icons/${icon.unique_id}`}
-                      state={{ gallerySearch: location.search }}
+                      state={{
+                        backgroundLocation: location,
+                        gallerySearch: location.search,
+                      }}
                     >
                       {src ? (
                         <img src={src} alt="" loading="lazy" />
