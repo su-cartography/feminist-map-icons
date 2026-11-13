@@ -80,6 +80,15 @@
   font-weight: 600;
 }
 
+button.site-nav__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .site-nav__link::after {
   content: '';
   position: absolute;
@@ -208,6 +217,69 @@
   transform: translateY(-2px);
   box-shadow: 0 8px 18px rgba(91, 61, 154, 0.28);
   filter: brightness(1.05);
+}
+
+.sign-in {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 22rem;
+  margin-top: 1.5rem;
+}
+
+.sign-in label {
+  font-weight: 600;
+}
+
+.sign-in input {
+  margin-bottom: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  font: inherit;
+}
+
+.sign-in input:focus {
+  border-color: var(--purple);
+  outline: 2px solid rgba(91, 61, 154, 0.25);
+}
+
+.page .sign-in__error {
+  margin: 0;
+  color: #b3261e;
+}
+
+.sign-in .btn {
+  justify-self: start;
+}
+
+.toast {
+  position: fixed;
+  top: 5.5rem;
+  /* Lines up under the nav's right edge, then steps in a little. */
+  right: calc(max((100vw - var(--max)) / 2, 1rem) + 1.5rem);
+  z-index: 50;
+  padding: 0.6rem 1.1rem;
+  border-radius: 0.375rem;
+  background: var(--purple);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  animation: toast-fade 4s var(--ease) forwards;
+}
+
+@keyframes toast-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+  12%,
+  80% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 .btn-yellow {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import logo from '../assets/logo.png'
+import { useAuth } from '../auth'
 
 const navClass = ({ isActive }) =>
   isActive ? 'site-nav__link is-active' : 'site-nav__link'
@@ -16,6 +17,8 @@ export default function Layout() {
   const [scrolled, setScrolled] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
+  const { token, signOut } = useAuth()
+  const [notice, setNotice] = useState('')
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8)
@@ -23,6 +26,19 @@ export default function Layout() {
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
+
+  // Matches the toast-fade animation in App.css; clearing lets the next sign-out show it again.
+  useEffect(() => {
+    if (!notice) return
+    const timer = setTimeout(() => setNotice(''), 4000)
+    return () => clearTimeout(timer)
+  }, [notice])
+
+  async function handleSignOut() {
+    await signOut()
+    navigate('/')
+    setNotice('Signed out')
+  }
 
   function handleSearchClick(event) {
     event.preventDefault()
@@ -58,12 +74,30 @@ export default function Layout() {
             <NavLink to="/contribute" className={navClass}>
               Contribute
             </NavLink>
+            {token ? (
+              <button
+                type="button"
+                className="site-nav__link"
+                onClick={handleSignOut}
+              >
+                Sign out
+              </button>
+            ) : (
+              <NavLink to="/sign-in" className={navClass}>
+                Sign in
+              </NavLink>
+            )}
           </nav>
         </div>
       </header>
       <main id="main" className="site-main">
         <Outlet />
       </main>
+      {notice && (
+        <div className="toast" role="status">
+          {notice}
+        </div>
+      )}
       <footer className="site-footer">
         <div className="site-footer__inner">
           <p>
