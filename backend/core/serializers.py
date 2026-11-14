@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
-from .models import Icon, Tag
+from .models import ContributorAccessRequest, Icon, Tag
 
 
 # Turns a Tag database row into JSON (and back).
@@ -106,3 +106,53 @@ class IconSerializer(serializers.ModelSerializer):
 # Body of POST /api/icons/<unique_id>/review/
 class IconStatusSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=Icon.Status.choices)
+
+
+class ContributorAccessRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContributorAccessRequest
+        fields = ["id", "status", "note", "created_at", "updated_at"]
+        read_only_fields = ["id", "status", "created_at", "updated_at"]
+
+
+class MeSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    is_contributor = serializers.BooleanField()
+    access_request = ContributorAccessRequestSerializer(allow_null=True)
+
+
+class RegisterSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=150)
+    email = serializers.EmailField()
+    full_name = serializers.CharField(max_length=150, allow_blank=True, required=False)
+    password = serializers.CharField(write_only=True, min_length=8)
+    password_confirm = serializers.CharField(write_only=True)
+
+    def validate_username(self, value):
+        from django.contrib.auth.models import User
+
+        username = value.strip()
+        if not username:
+            raise serializers.ValidationError("Username is required.")
+        if User.objects.filter(username__iexact=username).exists():
+            raise serializers.ValidationError("That username is already taken.")
+        return username
+
+    def validate(self, attrs):
+        if attrs["password"] != attrs["password_confirm"]:
+            raise serializers.ValidationError(
+                {"password_confirm": "Passwords do not match."}
+            )
+        return attrs
+
+    def create(self, validated_data):
+        from django.contrib.auth.models import User
+
+        full_name = (validated_data.get("full_name") or "").strip()
+        # No Contributor (or any) group here — upload rights come only after admin grant.
+        return User.objects.create_user(
+            username=validated_data["username"],
+            email=validated_data["email"].strip(),
+            password=validated_data["password"],
+            first_name=full_name[:150],
+        )

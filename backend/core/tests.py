@@ -23,7 +23,7 @@ from rest_framework.test import APIRequestFactory
 from rest_framework.views import APIView
 
 from .admin import UserAdmin
-from .models import Icon, Tag
+from .models import ContributorAccessRequest, Icon, Tag
 from .permissions import IsContributorOrReadOnly
 from .roles import ADMIN, CONTRIBUTOR, MODERATOR, ROLE_PERMISSIONS
 from .validators import MAX_ICON_FILE_SIZE
@@ -447,6 +447,88 @@ class AuthTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
+class RegisterTests(APITestCase):
+    def test_register_creates_an_account_without_contributor_and_returns_a_token(self):
+        response = self.client.post(
+            "/api/auth/register/",
+            {
+                "username": "newbie",
+                "email": "newbie@example.com",
+                "full_name": "New Person",
+                "password": "secret123",
+                "password_confirm": "secret123",
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn("token", response.data)
+        user = User.objects.get(username="newbie")
+        self.assertFalse(user.groups.filter(name=CONTRIBUTOR).exists())
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {response.data['token']}")
+        me = self.client.get("/api/auth/me/")
+        self.assertFalse(me.data["is_contributor"])
+
+    def test_register_rejects_mismatched_passwords_and_taken_usernames(self):
+        User.objects.create_user("taken", password="pw")
+        mismatch = self.client.post(
+            "/api/auth/register/",
+            {
+                "username": "other",
+                "email": "a@example.com",
+                "password": "secret123",
+                "password_confirm": "different",
+            },
+        )
+        self.assertEqual(mismatch.status_code, status.HTTP_400_BAD_REQUEST)
+        taken = self.client.post(
+            "/api/auth/register/",
+            {
+                "username": "taken",
+                "email": "b@example.com",
+                "password": "secret123",
+                "password_confirm": "secret123",
+            },
+        )
+        self.assertEqual(taken.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class ContributorAccessRequestTests(APITestCase):
+    def setUp(self):
+        self.visitor = User.objects.create_user("asker", password="pw")
+        self.contributor = in_role(
+            User.objects.create_user("already", password="pw"), CONTRIBUTOR
+        )
+
+    def test_me_and_request_need_a_login(self):
+        self.assertEqual(
+            self.client.get("/api/auth/me/").status_code, status.HTTP_401_UNAUTHORIZED
+        )
+        self.assertEqual(
+            self.client.post("/api/auth/request-contributor/").status_code,
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    def test_a_signed_in_visitor_can_request_access(self):
+        self.client.force_authenticate(self.visitor)
+        response = self.client.post("/api/auth/request-contributor/", {"note": "I'd like to upload"})
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["status"], "pending")
+        me = self.client.get("/api/auth/me/")
+        self.assertEqual(me.status_code, status.HTTP_200_OK)
+        self.assertFalse(me.data["is_contributor"])
+        self.assertEqual(me.data["access_request"]["status"], "pending")
+
+    def test_a_second_pending_request_is_rejected(self):
+        self.client.force_authenticate(self.visitor)
+        self.client.post("/api/auth/request-contributor/")
+        response = self.client.post("/api/auth/request-contributor/")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_a_contributor_cannot_request_again(self):
+        self.client.force_authenticate(self.contributor)
+        response = self.client.post("/api/auth/request-contributor/")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
 class RoleTests(APITestCase):
     """The role boundaries from docs/permissions.md that is_staff cannot express."""
 
@@ -850,9 +932,14 @@ class ContributorApprovalTests(TestCase):
     # --- the done criteria ----------------------------------------------------------
 
     def test_an_admin_can_grant_contributor_access_and_the_user_can_then_upload(self):
+        ContributorAccessRequest.objects.create(user=self.applicant)
         self.assertFalse(self.can_upload(self.applicant, "pre1"))
         self.run_action(self.admin, "grant_contributor_access", self.applicant)
         self.assertTrue(self.can_upload(self.applicant, "post1"))
+        self.assertEqual(
+            ContributorAccessRequest.objects.get(user=self.applicant).status,
+            ContributorAccessRequest.Status.GRANTED,
+        )
 
     # The reason the action exists instead of auth.change_user: the user form could do
     # both of these, so assert the action leaves everything but one group alone.

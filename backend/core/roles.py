@@ -28,6 +28,8 @@ ROLE_PERMISSIONS = {
     ADMIN: (
         "core.add_icon", "core.change_icon", "core.delete_icon", "core.view_icon",
         "core.add_tag", "core.change_tag", "core.delete_tag", "core.view_tag",
+        "core.view_contributoraccessrequest",
+        "core.change_contributoraccessrequest",
         "auth.add_user", "auth.change_user", "auth.view_user",
     ),
 }

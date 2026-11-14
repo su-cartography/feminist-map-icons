@@ -82,3 +82,32 @@ class Icon(models.Model):
 
     def __str__(self):
         return self.primary_tag or self.unique_id
+
+
+# A signed-in visitor asks for upload rights; an admin grants the Contributor group
+# in Django admin. This row is the paper trail for that ask — not the grant itself.
+class ContributorAccessRequest(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        GRANTED = "granted", "Granted"
+        CLOSED = "closed", "Closed"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="contributor_access_requests",
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    note = models.CharField(max_length=500, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user} ({self.status})"
