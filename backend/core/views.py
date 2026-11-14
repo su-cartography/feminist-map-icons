@@ -4,9 +4,10 @@ from django.db.models import Q
 from django.http import FileResponse
 from rest_framework import status as http_status
 from rest_framework import viewsets
+from rest_framework.authtoken.models import Token
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import NotFound, PermissionDenied
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.renderers import BaseRenderer
 from rest_framework.response import Response
 from .models import Icon
@@ -22,6 +23,17 @@ from .serializers import IconSerializer, IconStatusSerializer
 @permission_classes([AllowAny])
 def health(request):
     return Response({"status": "ok"})
+
+
+# Deleting the token, rather than leaving sign-out to the browser, means a copy of it left
+# behind elsewhere (another tab, a shared lab machine) stops working too. Filtered by user,
+# not request.auth, because a session login (browsable API) has no token on the request.
+# IsAuthenticated alone: the project default would demand a Contributor role for any POST.
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def logout(request):
+    Token.objects.filter(user=request.user).delete()
+    return Response(status=http_status.HTTP_204_NO_CONTENT)
 
 
 # The icon file endpoints answer with bytes, not JSON. DRF picks a renderer before the

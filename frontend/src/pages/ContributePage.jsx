@@ -1,6 +1,12 @@
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
+import { useAuth } from '../auth'
 
 export default function ContributePage() {
+  const { token } = useAuth()
+
+  // Signed-out visitors should land on the auth page first.
+  if (!token) return <Navigate to="/sign-in" replace />
+
   return (
     <section className="page wrap">
       <h1>Contribute</h1>

@@ -7,6 +7,7 @@ import {
 } from 'react-router-dom'
 import logo from '../assets/logo.png'
 import qgisPreview from '../assets/qgis-preview.png'
+import { useAuth } from '../auth'
 
 const ABOUT_CARDS = [
   {
@@ -60,6 +61,8 @@ function scrollToGallery() {
 export default function HomePage() {
   const location = useLocation()
   const navigate = useNavigate()
+  const { token } = useAuth()
+  const contributeTo = token ? '/contribute' : '/sign-in'
   // The URL is the source of truth for the search, so a back link or a
   // shared link lands on the same results.
   const [searchParams] = useSearchParams()
@@ -187,7 +190,7 @@ export default function HomePage() {
           <Link className="btn" to="/resources">
             Resources
           </Link>
-          <Link className="btn" to="/contribute">
+          <Link className="btn" to={contributeTo}>
             Contribute
           </Link>
         </div>
@@ -346,7 +349,7 @@ export default function HomePage() {
       <section className="contribute-teaser wrap">
         <h2>Contribute</h2>
         <p>Contribute feminist map icons to the gallery.</p>
-        <Link className="btn" to="/contribute">
+        <Link className="btn" to={contributeTo}>
           Contribute
         </Link>
       </section>

@@ -1,7 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 from rest_framework.authtoken.views import obtain_auth_token
-from .views import IconViewSet, health
+from .views import IconViewSet, health, logout
 
 router = DefaultRouter()
 router.register("icons", IconViewSet, basename="icon")
@@ -9,5 +9,6 @@ router.register("icons", IconViewSet, basename="icon")
 urlpatterns = [
     path("health/", health),
     path("auth/login/", obtain_auth_token), # POST username + password ... token
+    path("auth/logout/", logout), # POST with the token ... token deleted
     path("", include(router.urls)),
 ]

@@ -417,6 +417,36 @@ class HealthTests(APITestCase):
         self.assertEqual(response.data, {"status": "ok"})
 
 
+class AuthTests(APITestCase):
+    def setUp(self):
+        User.objects.create_user("signer", password="pw-signer-1")
+
+    def test_login_returns_token_and_bad_password_is_400(self):
+        response = self.client.post(
+            "/api/auth/login/", {"username": "signer", "password": "pw-signer-1"}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("token", response.data)
+        response = self.client.post(
+            "/api/auth/login/", {"username": "signer", "password": "wrong"}
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_logout_revokes_the_token(self):
+        token = self.client.post(
+            "/api/auth/login/", {"username": "signer", "password": "pw-signer-1"}
+        ).data["token"]
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token}")
+        response = self.client.post("/api/auth/logout/")
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        response = self.client.post("/api/auth/logout/")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_logout_needs_a_login(self):
+        response = self.client.post("/api/auth/logout/")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
 class RoleTests(APITestCase):
     """The role boundaries from docs/permissions.md that is_staff cannot express."""
 
