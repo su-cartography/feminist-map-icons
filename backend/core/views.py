@@ -10,10 +10,16 @@ from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.renderers import BaseRenderer
 from rest_framework.response import Response
-from .models import Icon
+from .models import ContributorAccessRequest, Icon
 from .permissions import IsContributorOrReadOnly, IsOwnerOrModerator, IsReviewer
-from .roles import is_admin, is_moderator
-from .serializers import IconSerializer, IconStatusSerializer
+from .roles import is_admin, is_contributor, is_moderator
+from .serializers import (
+    ContributorAccessRequestSerializer,
+    IconSerializer,
+    IconStatusSerializer,
+    MeSerializer,
+    RegisterSerializer,
+)
 
 
 # Simple check: "Is the API running?"
@@ -34,6 +40,76 @@ def health(request):
 def logout(request):
     Token.objects.filter(user=request.user).delete()
     return Response(status=http_status.HTTP_204_NO_CONTENT)
+
+
+# Open registration: creates a plain account with no role. Contributor is granted later
+# in Django admin after they request access.
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def register(request):
+    serializer = RegisterSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    user = serializer.save()
+    token, _ = Token.objects.get_or_create(user=user)
+    return Response({"token": token.key}, status=http_status.HTTP_201_CREATED)
+
+
+def _latest_access_request(user):
+    return (
+        ContributorAccessRequest.objects.filter(user=user)
+        .order_by("-created_at")
+        .first()
+    )
+
+
+def _me_payload(user):
+    latest = _latest_access_request(user)
+    return {
+        "username": user.get_username(),
+        "is_contributor": is_contributor(user),
+        "access_request": (
+            ContributorAccessRequestSerializer(latest).data if latest else None
+        ),
+    }
+
+
+# Who am I, and have I already asked for contributor access?
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def me(request):
+    return Response(MeSerializer(_me_payload(request.user)).data)
+
+
+# Signed-in visitor asks for upload rights. Admin still grants the Contributor group
+# in Django admin; this only records the ask.
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def request_contributor_access(request):
+    user = request.user
+    if is_contributor(user):
+        return Response(
+            {"detail": "You already have contributor access."},
+            status=http_status.HTTP_400_BAD_REQUEST,
+        )
+
+    pending = ContributorAccessRequest.objects.filter(
+        user=user, status=ContributorAccessRequest.Status.PENDING
+    ).first()
+    if pending:
+        return Response(
+            {
+                "detail": "Your request is already pending approval.",
+                "access_request": ContributorAccessRequestSerializer(pending).data,
+            },
+            status=http_status.HTTP_400_BAD_REQUEST,
+        )
+
+    note = (request.data.get("note") or "").strip()
+    created = ContributorAccessRequest.objects.create(user=user, note=note)
+    return Response(
+        ContributorAccessRequestSerializer(created).data,
+        status=http_status.HTTP_201_CREATED,
+    )
 
 
 # The icon file endpoints answer with bytes, not JSON. DRF picks a renderer before the

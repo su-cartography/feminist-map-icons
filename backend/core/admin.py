@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.models import Group, User
 
-from .models import Icon, Tag
+from .models import ContributorAccessRequest, Icon, Tag
 from .roles import CONTRIBUTOR, is_admin
 
 
@@ -37,6 +37,30 @@ class IconAdmin(admin.ModelAdmin):
         if not change and not is_admin(request.user):
             obj.status = Icon.Status.PENDING
         super().save_model(request, obj, form, change)
+
+
+@admin.register(ContributorAccessRequest)
+class ContributorAccessRequestAdmin(admin.ModelAdmin):
+    list_display = ("user", "status", "note", "created_at", "updated_at")
+    list_filter = ("status",)
+    search_fields = ("user__username", "user__email", "note")
+    readonly_fields = ("user", "note", "created_at", "updated_at")
+    ordering = ("-created_at",)
+
+    def has_module_permission(self, request):
+        return is_admin(request.user)
+
+    def has_view_permission(self, request, obj=None):
+        return is_admin(request.user)
+
+    def has_change_permission(self, request, obj=None):
+        return is_admin(request.user)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return is_admin(request.user)
 
 
 # Approving a contributor account through Django's user form means handing out
@@ -79,9 +103,17 @@ class UserAdmin(DjangoUserAdmin):
         if grant:
             changed = list(queryset.exclude(groups=group))
             group.user_set.add(*changed)
+            ContributorAccessRequest.objects.filter(
+                user__in=changed,
+                status=ContributorAccessRequest.Status.PENDING,
+            ).update(status=ContributorAccessRequest.Status.GRANTED)
         else:
             changed = list(queryset.filter(groups=group))
             group.user_set.remove(*changed)
+            ContributorAccessRequest.objects.filter(
+                user__in=changed,
+                status=ContributorAccessRequest.Status.GRANTED,
+            ).update(status=ContributorAccessRequest.Status.CLOSED)
 
         if not changed:
             self.message_user(request, "No accounts needed that change.")

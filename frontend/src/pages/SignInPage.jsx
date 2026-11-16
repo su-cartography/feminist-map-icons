@@ -3,7 +3,7 @@ import { Navigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 
 export default function SignInPage() {
-  const { token, signIn } = useAuth()
+  const { token, signIn, signUp } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const modeParam = searchParams.get('mode') === 'signup' ? 'signup' : 'signin'
   const [mode, setMode] = useState(modeParam)
@@ -48,12 +48,32 @@ export default function SignInPage() {
     }
   }
 
-  function handleSignUp(event) {
+  async function handleSignUp(event) {
     event.preventDefault()
+    const form = new FormData(event.currentTarget)
+    const password = form.get('password')
+    const passwordConfirm = form.get('confirm_password')
     setError('')
-    setNotice(
-      'Sign-up and access requests come in the next issue. For now, ask a project admin to create your account, then sign in here. Contributor upload rights are granted after approval.',
-    )
+    setNotice('')
+    if (password !== passwordConfirm) {
+      setError('Passwords do not match.')
+      return
+    }
+    setSubmitting(true)
+    try {
+      await signUp({
+        username: form.get('username'),
+        email: form.get('email'),
+        fullName: form.get('full_name'),
+        password,
+        passwordConfirm,
+      })
+    } catch (err) {
+      setError(
+        err instanceof TypeError ? 'Could not reach the server.' : err.message,
+      )
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -150,12 +170,19 @@ export default function SignInPage() {
               </form>
             ) : (
               <form className="auth-form" onSubmit={handleSignUp}>
+                <label htmlFor={`${formId}-username-new`}>Username</label>
+                <input
+                  id={`${formId}-username-new`}
+                  name="username"
+                  autoComplete="username"
+                  required
+                />
+
                 <label htmlFor={`${formId}-name`}>Full name</label>
                 <input
                   id={`${formId}-name`}
                   name="full_name"
                   autoComplete="name"
-                  required
                 />
 
                 <label htmlFor={`${formId}-email`}>Email</label>
@@ -174,6 +201,7 @@ export default function SignInPage() {
                     name="password"
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="new-password"
+                    minLength={8}
                     required
                   />
                   <button
@@ -193,6 +221,7 @@ export default function SignInPage() {
                     name="confirm_password"
                     type={showConfirm ? 'text' : 'password'}
                     autoComplete="new-password"
+                    minLength={8}
                     required
                   />
                   <button
@@ -207,19 +236,28 @@ export default function SignInPage() {
                   </button>
                 </div>
 
+                {error && (
+                  <p className="auth-form__error" role="alert">
+                    {error}
+                  </p>
+                )}
                 {notice && (
                   <p className="auth-form__notice" role="status">
                     {notice}
                   </p>
                 )}
 
-                <button type="submit" className="btn auth-form__submit">
-                  Create account
+                <button
+                  type="submit"
+                  className="btn auth-form__submit"
+                  disabled={submitting}
+                >
+                  {submitting ? 'Creating account…' : 'Create account'}
                 </button>
                 <p className="auth-form__hint">
-                  Next: create account → request contributor access → wait for
-                  approval → sign in to upload. This form will power that in the
-                  next issue.
+                  Creating an account does not grant upload rights. After you
+                  sign up, request contributor access and wait for admin
+                  approval.
                 </p>
               </form>
             )}

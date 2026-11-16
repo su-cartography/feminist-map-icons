@@ -17,8 +17,10 @@ export default function Layout() {
   const [scrolled, setScrolled] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
-  const { token, signOut } = useAuth()
+  const { token, me, signOut } = useAuth()
   const [notice, setNotice] = useState('')
+  const [chipReady, setChipReady] = useState(false)
+  const signedInAs = me?.username
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8)
@@ -33,6 +35,18 @@ export default function Layout() {
     const timer = setTimeout(() => setNotice(''), 4000)
     return () => clearTimeout(timer)
   }, [notice])
+
+  useEffect(() => {
+    if (!token) {
+      setChipReady(false)
+      return
+    }
+    setChipReady(false)
+    const frame = requestAnimationFrame(() => {
+      requestAnimationFrame(() => setChipReady(true))
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [token, signedInAs])
 
   async function handleSignOut() {
     await signOut()
@@ -80,20 +94,38 @@ export default function Layout() {
                 Contribute
               </NavLink>
             )}
-            {token ? (
+          </nav>
+
+          {token ? (
+            <div
+              className={
+                chipReady ? 'site-session is-ready' : 'site-session'
+              }
+            >
+              <span className="site-session__glow" aria-hidden="true" />
+              <span className="site-session__live" aria-hidden="true" />
+              <div className="site-session__copy">
+                <span className="site-session__label">Signed in as</span>
+                <strong
+                  className="site-session__name"
+                  key={signedInAs || 'loading'}
+                >
+                  {signedInAs || '…'}
+                </strong>
+              </div>
               <button
                 type="button"
-                className="site-nav__link"
+                className="site-session__out"
                 onClick={handleSignOut}
               >
                 Sign out
               </button>
-            ) : (
-              <NavLink to="/sign-in" className={navClass}>
-                Sign in
-              </NavLink>
-            )}
-          </nav>
+            </div>
+          ) : (
+            <NavLink to="/sign-in" className="site-session site-session--guest">
+              Sign in
+            </NavLink>
+          )}
         </div>
       </header>
       <main id="main" className="site-main">
