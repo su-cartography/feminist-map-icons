@@ -8,6 +8,7 @@ import {
 import logo from '../assets/logo.png'
 import qgisPreview from '../assets/qgis-preview.png'
 import { useAuth } from '../auth'
+import { downloadPickedZip } from '../utils/zipDownload'
 
 const ABOUT_CARDS = [
   {
@@ -88,6 +89,9 @@ export default function HomePage() {
     previous: null,
   })
   const [format, setFormat] = useState('png')
+  const [selectMode, setSelectMode] = useState(false)
+  const [picked, setPicked] = useState(() => new Set())
+  const [zipBusy, setZipBusy] = useState(null)
 
   const showSearch = useCallback(
     (nextQ, nextPage, options) => {
@@ -161,6 +165,64 @@ export default function HomePage() {
       return () => window.clearTimeout(timer)
     }
   }, [location.hash])
+
+  function setSelectModeOff() {
+    setSelectMode(false)
+    setPicked(new Set())
+    setZipBusy(null)
+  }
+
+  useEffect(() => {
+    function onKeyDown(event) {
+      if (event.key !== 'Escape' || !selectMode) return
+      setSelectMode(false)
+      setPicked(new Set())
+      setZipBusy(null)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [selectMode])
+
+  function toggleSelectMode() {
+    if (selectMode) {
+      setSelectModeOff()
+      return
+    }
+    setSelectMode(true)
+  }
+
+  function togglePicked(uniqueId) {
+    setPicked((current) => {
+      const next = new Set(current)
+      if (next.has(uniqueId)) next.delete(uniqueId)
+      else next.add(uniqueId)
+      return next
+    })
+  }
+
+  function selectAllVisible() {
+    setPicked(new Set(gallery.icons.map((icon) => icon.unique_id)))
+  }
+
+  function clearPicked() {
+    setPicked(new Set())
+  }
+
+  async function downloadPicked(kind) {
+    const list = gallery.icons.filter((icon) => picked.has(icon.unique_id))
+    if (!list.length) return
+    setZipBusy(kind)
+    try {
+      await downloadPickedZip(list, kind)
+    } catch (err) {
+      console.error(err)
+      alert(err.message || `Could not prepare that ${kind.toUpperCase()} download.`)
+    } finally {
+      setZipBusy(null)
+    }
+  }
+
+  const pickedCount = picked.size
 
   return (
     <div className="home">
@@ -245,21 +307,124 @@ export default function HomePage() {
             <p className="format-mode">
               {format === 'svg' ? 'Showing SVGs' : 'Showing PNGs'}
             </p>
-            <button
-              type="button"
-              className={
-                format === 'svg' ? 'rainbow-toggle is-svg' : 'rainbow-toggle'
-              }
-              aria-pressed={format === 'svg'}
-              title="Switch between PNG and SVG"
-              aria-label="Switch between PNG and SVG icons"
-              onClick={() =>
-                setFormat((current) => (current === 'png' ? 'svg' : 'png'))
-              }
-            >
-              <span className="sr-only">Toggle PNG / SVG</span>
-            </button>
+            <div className="grid-toolbar-actions">
+              <button
+                type="button"
+                className="select-toggle"
+                aria-pressed={selectMode ? 'true' : 'false'}
+                onClick={toggleSelectMode}
+              >
+                {selectMode ? 'Selecting…' : 'Select'}
+              </button>
+              <button
+                type="button"
+                className={
+                  format === 'svg' ? 'rainbow-toggle is-svg' : 'rainbow-toggle'
+                }
+                aria-pressed={format === 'svg'}
+                title="Switch between PNG and SVG"
+                aria-label="Switch between PNG and SVG icons"
+                onClick={() =>
+                  setFormat((current) => (current === 'png' ? 'svg' : 'png'))
+                }
+              >
+                <span className="sr-only">Toggle PNG / SVG</span>
+              </button>
+            </div>
           </div>
+
+          {selectMode && (
+            <div className="select-bar">
+              <p className="select-count">
+                {pickedCount === 1 ? '1 selected' : `${pickedCount} selected`}
+              </p>
+              <div className="select-bar-actions">
+                <button
+                  type="button"
+                  className="select-bar-btn"
+                  onClick={selectAllVisible}
+                >
+                  Select all
+                </button>
+                <button
+                  type="button"
+                  className="select-bar-btn"
+                  onClick={clearPicked}
+                >
+                  Clear
+                </button>
+                <button
+                  type="button"
+                  className={
+                    zipBusy === 'png'
+                      ? 'select-dl select-dl-png is-busy'
+                      : 'select-dl select-dl-png'
+                  }
+                  disabled={pickedCount === 0 || zipBusy}
+                  title="Download selected PNGs and their metadata"
+                  onClick={() => downloadPicked('png')}
+                >
+                  <svg
+                    className="select-dl-icon"
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    aria-hidden="true"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 3v12" />
+                    <path d="m7 10 5 5 5-5" />
+                    <path d="M5 21h14" />
+                  </svg>
+                  <span className="select-dl-label">
+                    {zipBusy === 'png' ? 'Preparing…' : 'Download PNGs'}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className={
+                    zipBusy === 'svg'
+                      ? 'select-dl select-dl-svg is-busy'
+                      : 'select-dl select-dl-svg'
+                  }
+                  disabled={pickedCount === 0 || zipBusy}
+                  title="Download selected SVGs and their metadata"
+                  onClick={() => downloadPicked('svg')}
+                >
+                  <svg
+                    className="select-dl-icon"
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    aria-hidden="true"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 3v12" />
+                    <path d="m7 10 5 5 5-5" />
+                    <path d="M5 21h14" />
+                  </svg>
+                  <span className="select-dl-label">
+                    {zipBusy === 'svg' ? 'Preparing…' : 'Download SVGs'}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="select-bar-btn select-done"
+                  onClick={setSelectModeOff}
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          )}
 
           <p className="home-gallery__status" aria-live="polite">
             {status === 'loading' && 'Loading icons…'}
@@ -278,13 +443,57 @@ export default function HomePage() {
           </p>
 
           {gallery.icons.length > 0 && (
-            <ul className="icon-grid">
+            <ul className={selectMode ? 'icon-grid is-selecting' : 'icon-grid'}>
               {gallery.icons.map((icon, index) => {
                 const label = icon.primary_tag || icon.unique_id
                 const src =
                   format === 'svg' && icon.svg_file
                     ? icon.svg_file
                     : icon.png_file
+                const isPicked = picked.has(icon.unique_id)
+                const cardClass = isPicked ? 'icon-card is-picked' : 'icon-card'
+
+                if (selectMode) {
+                  return (
+                    <li key={icon.unique_id} style={{ '--i': index }}>
+                      <button
+                        type="button"
+                        className={cardClass}
+                        data-id={icon.unique_id}
+                        aria-pressed={isPicked}
+                        onClick={() => togglePicked(icon.unique_id)}
+                      >
+                        <span
+                          className="icon-check-wrap"
+                          onClick={(event) => {
+                            event.preventDefault()
+                            event.stopPropagation()
+                            togglePicked(icon.unique_id)
+                          }}
+                        >
+                          <input
+                            className="icon-check"
+                            type="checkbox"
+                            checked={isPicked}
+                            readOnly
+                            tabIndex={-1}
+                            aria-hidden="true"
+                          />
+                        </span>
+                        {src ? (
+                          <img src={src} alt="" loading="lazy" />
+                        ) : (
+                          <span
+                            className="icon-card__fallback"
+                            aria-hidden="true"
+                          />
+                        )}
+                        <span className="icon-card__label">{label}</span>
+                      </button>
+                    </li>
+                  )
+                }
+
                 return (
                   <li key={icon.unique_id} style={{ '--i': index }}>
                     <Link
