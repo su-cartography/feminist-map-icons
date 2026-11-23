@@ -648,6 +648,14 @@ class RoleTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
+    def test_upload_without_unique_id_gets_an_eight_hex_id(self):
+        self.client.force_authenticate(self.contributor)
+        response = self.client.post(reverse("icon-list"), {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        unique_id = response.data["unique_id"]
+        self.assertRegex(unique_id, r"^[0-9a-f]{8}$")
+        self.assertTrue(Icon.objects.filter(unique_id=unique_id).exists())
+
     # Every Admin fixture only ever hit review/, whose permission_classes replace the
     # viewset's -- so nothing exercised an Admin through IsContributorOrReadOnly at all.
     def test_an_admin_has_full_crud_on_icons(self):

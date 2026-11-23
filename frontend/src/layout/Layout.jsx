@@ -137,8 +137,13 @@ export default function Layout() {
         </div>
       )}
       <footer className="site-footer">
+        <div className="site-footer__glow" aria-hidden="true" />
         <div className="site-footer__inner">
-          <p>
+          <div className="site-footer__brand">
+            <img src={logo} alt="" width={36} height={36} />
+            <span>Gallery of Possibilities</span>
+          </div>
+          <p className="site-footer__contact">
             Contact:{' '}
             <a href="mailto:mkelly51@syr.edu">mkelly51@syr.edu</a>
           </p>
