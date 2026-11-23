@@ -1,3 +1,5 @@
+import secrets
+
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
@@ -52,6 +54,10 @@ class IconSerializer(serializers.ModelSerializer):
         # status is read-only on purpose: a check only in create() is one PATCH away
         # from being skipped. It moves through the submit/review actions instead.
         read_only_fields = ["status", "created_at", "updated_at"]
+        # Clients may omit unique_id; create() fills an 8-hex id to match the library.
+        extra_kwargs = {
+            "unique_id": {"required": False, "allow_blank": True},
+        }
 
     # Find or create Tag rows, then link them to this icon (replaces old secondary tags)
     def _set_tags(self, icon, tag_names):
@@ -66,9 +72,24 @@ class IconSerializer(serializers.ModelSerializer):
             tags.append(tag)
         icon.tags.set(tags)
 
+    def _allocate_unique_id(self):
+        # Same shape as imported Zenodo ids (e.g. 00e8059e): 8 lowercase hex chars.
+        for _ in range(32):
+            candidate = secrets.token_hex(4)
+            if not Icon.objects.filter(unique_id=candidate).exists():
+                return candidate
+        raise serializers.ValidationError(
+            {"unique_id": "Could not allocate a unique id. Try again."}
+        )
+
     # POST: create a new icon
     def create(self, validated_data):
         tag_names = validated_data.pop("tag_names", None)
+        unique_id = (validated_data.get("unique_id") or "").strip()
+        if unique_id:
+            validated_data["unique_id"] = unique_id
+        else:
+            validated_data["unique_id"] = self._allocate_unique_id()
         # New uploads still start as pending (waiting for review); that is the model
         # default now that status is read-only here.
         icon = Icon.objects.create(**validated_data)

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../auth'
+import IconUploadForm from '../components/IconUploadForm'
 
 export default function ContributePage() {
   const { token, me, meStatus, requestContributorAccess, refreshMe } = useAuth()
@@ -50,7 +51,7 @@ export default function ContributePage() {
   }
 
   return (
-    <section className="page wrap">
+    <section className="page wrap contribute-page">
       <h1>Contribute</h1>
 
       {meStatus === 'loading' && (
@@ -79,7 +80,7 @@ export default function ContributePage() {
               </p>
               <p>
                 You still cannot upload. After an admin grants access, use
-                Check access below to unlock the upload placeholder.
+                Check access below to unlock the upload form.
               </p>
               {error && (
                 <p className="access-form__error" role="alert">
@@ -120,21 +121,7 @@ export default function ContributePage() {
       )}
 
       {meStatus === 'ready' && isContributor && (
-        <div className="upload-placeholder">
-          <h2>Upload icons</h2>
-          <p>
-            You have contributor access. The full upload and create flows come
-            in a later issue — these controls are placeholders for that work.
-          </p>
-          <div className="actions actions--start">
-            <button type="button" className="btn" disabled>
-              Upload (soon)
-            </button>
-            <button type="button" className="btn btn-yellow" disabled>
-              Create (soon)
-            </button>
-          </div>
-        </div>
+        <IconUploadForm token={token} username={me.username} />
       )}
 
       <p>
