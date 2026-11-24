@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import PageHero from '../components/PageHero'
 
 const RESOURCE_GROUPS = [
   {
@@ -60,41 +61,40 @@ export default function ResourcesPage() {
   }, [])
 
   return (
-    <section className={visible ? 'resources-page wrap is-in' : 'resources-page wrap'}>
-      <div className="resources-hero">
-        <p className="resources-hero__eyebrow">Gallery of Possibilities</p>
-        <h1>Resources</h1>
-        <p className="resources-hero__lead">
-          Teaching guides, readings, and documentation for the gallery and QGIS
-          plugin.
-        </p>
-      </div>
+    <section className={visible ? 'resources-page is-in' : 'resources-page'}>
+      <PageHero
+        eyebrow="Gallery of Possibilities"
+        title="Resources"
+        lead="Teaching guides, readings, and documentation for the gallery and QGIS plugin."
+      />
 
-      <ul className="resources-grid">
-        {RESOURCE_GROUPS.map((group, index) => (
-          <li
-            key={group.title}
-            className="resources-card"
-            style={{ '--r': index }}
-          >
-            <h2>{group.title}</h2>
-            <p>{group.body}</p>
-            <div className="resources-card__links">
-              {group.links.map((link) => (
-                <a
-                  key={link.href}
-                  href={link.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {link.label}
-                  <span aria-hidden="true">↗</span>
-                </a>
-              ))}
-            </div>
-          </li>
-        ))}
-      </ul>
+      <div className="wrap">
+        <ul className="resources-grid">
+          {RESOURCE_GROUPS.map((group, index) => (
+            <li
+              key={group.title}
+              className="resources-card"
+              style={{ '--r': index }}
+            >
+              <h2>{group.title}</h2>
+              <p>{group.body}</p>
+              <div className="resources-card__links">
+                {group.links.map((link) => (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {link.label}
+                    <span aria-hidden="true">↗</span>
+                  </a>
+                ))}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
     </section>
   )
 }

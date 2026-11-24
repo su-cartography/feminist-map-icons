@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
+import PageHero from '../components/PageHero'
 
 export default function SignInPage() {
   const { token, signIn, signUp } = useAuth()
@@ -77,19 +78,19 @@ export default function SignInPage() {
   }
 
   return (
-    <section className="auth-page wrap">
-      <div className="auth-shell">
-        <div className="auth-card">
-          <p className="auth-card__eyebrow">Gallery of Possibilities</p>
-          <h1 className="auth-card__title">
-            {mode === 'signin' ? 'Welcome back' : 'Join the gallery'}
-          </h1>
-          <p className="auth-card__lead">
-            {mode === 'signin'
-              ? 'Sign in with your account to contribute feminist map icons.'
-              : 'Create an account first, then request contributor access. You can upload only after the team approves you.'}
-          </p>
+    <section className="auth-page">
+      <PageHero
+        eyebrow="Gallery of Possibilities"
+        title={mode === 'signin' ? 'Welcome back' : 'Join the gallery'}
+        lead={
+          mode === 'signin'
+            ? 'Sign in with your account to contribute feminist map icons.'
+            : 'Create an account first, then request contributor access. You can upload only after the team approves you.'
+        }
+      />
 
+      <div className="wrap auth-shell">
+        <div className="auth-card">
           <div
             className="auth-toggle"
             role="tablist"

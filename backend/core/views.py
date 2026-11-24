@@ -158,7 +158,13 @@ class IconViewSet(viewsets.ModelViewSet):
         qs = Icon.objects.prefetch_related("tags").order_by("unique_id")
 
         user = self.request.user
-        if not is_moderator(user):
+        # /api/icons/?mine=1 — only the caller's own uploads (all statuses).
+        mine = self.request.query_params.get("mine")
+        if mine in ("1", "true", "yes"):
+            if not user.is_authenticated:
+                return qs.none()
+            qs = qs.filter(created_by=user)
+        elif not is_moderator(user):
             # Visitors see published only; contributors also see their own submissions,
             # so a fresh upload is visible to its author instead of 404ing.
             visible = Q(status=Icon.Status.PUBLISHED)

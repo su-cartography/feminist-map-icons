@@ -4,6 +4,7 @@ import ContributePage from './pages/ContributePage'
 import GalleryPage from './pages/GalleryPage'
 import HomePage from './pages/HomePage'
 import IconDetailPage from './pages/IconDetailPage'
+import MySubmissionsPage from './pages/MySubmissionsPage'
 import ResourcesPage from './pages/ResourcesPage'
 import SignInPage from './pages/SignInPage'
 import './App.css'
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="icons/:uniqueId" element={<IconDetailPage />} />
           <Route path="resources" element={<ResourcesPage />} />
           <Route path="contribute" element={<ContributePage />} />
+          <Route path="my-submissions" element={<MySubmissionsPage />} />
           <Route path="sign-in" element={<SignInPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
