@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useAuth } from '../auth'
 import { saveFile } from '../utils/download'
 
 const META_FIELDS = [
@@ -31,6 +32,7 @@ export default function IconDetailPage() {
   const { uniqueId } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
+  const { token } = useAuth()
   const titleId = useId()
   const menuId = useId()
   const closingRef = useRef(false)
@@ -84,6 +86,7 @@ export default function IconDetailPage() {
     setMenuOpen(false)
 
     fetch(`/api/icons/${encodeURIComponent(uniqueId)}/`, {
+      headers: token ? { Authorization: `Token ${token}` } : undefined,
       signal: controller.signal,
     })
       .then(async (response) => {
@@ -101,7 +104,7 @@ export default function IconDetailPage() {
       })
 
     return () => controller.abort()
-  }, [uniqueId])
+  }, [uniqueId, token])
 
   useEffect(() => {
     function onKeyDown(event) {
@@ -134,10 +137,9 @@ export default function IconDetailPage() {
     event.stopPropagation()
     if (!icon) return
 
-    const url = kind === 'png' ? icon.png_file : icon.svg_file
     const filename = `${icon.unique_id}.${kind}`
-
-    if (!url) {
+    const hasFile = kind === 'png' ? icon.png_file : icon.svg_file
+    if (!hasFile) {
       alert(`This icon has no ${kind.toUpperCase()} file.`)
       return
     }
@@ -146,7 +148,12 @@ export default function IconDetailPage() {
     // instead of the browser navigating to the API image URL.
     setDownloading(kind)
     try {
-      const response = await fetch(url)
+      const response = await fetch(
+        `/api/icons/${encodeURIComponent(icon.unique_id)}/${kind}/`,
+        {
+          headers: token ? { Authorization: `Token ${token}` } : undefined,
+        },
+      )
       if (!response.ok) throw new Error('download failed')
       const blob = await response.blob()
       await saveFile(blob, filename)
@@ -162,6 +169,45 @@ export default function IconDetailPage() {
   const title =
     (icon && (icon.primary_tag || icon.unique_id)) || 'Icon details'
   const previewSrc = icon?.png_file || icon?.svg_file || ''
+  const [previewBlob, setPreviewBlob] = useState('')
+
+  useEffect(() => {
+    if (!uniqueId) {
+      setPreviewBlob('')
+      return undefined
+    }
+    const controller = new AbortController()
+    let objectUrl = ''
+    let cancelled = false
+
+    async function loadPreview() {
+      const kinds = previewSrc?.includes('/svg/')
+        ? ['svg', 'png']
+        : ['png', 'svg']
+      for (const kind of kinds) {
+        const response = await fetch(
+          `/api/icons/${encodeURIComponent(uniqueId)}/${kind}/`,
+          {
+            headers: token ? { Authorization: `Token ${token}` } : undefined,
+            signal: controller.signal,
+          },
+        )
+        if (!response.ok) continue
+        const blob = await response.blob()
+        if (cancelled || !blob || blob.size === 0) return
+        objectUrl = URL.createObjectURL(blob)
+        setPreviewBlob(objectUrl)
+        return
+      }
+    }
+
+    loadPreview().catch(() => {})
+    return () => {
+      cancelled = true
+      controller.abort()
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [uniqueId, previewSrc, token])
 
   return (
     <div className={isOpen ? 'mini is-open' : 'mini'} role="presentation">
@@ -201,10 +247,10 @@ export default function IconDetailPage() {
           <>
             <div className="mini-visual">
               <div className="detail-preview-frame">
-                {previewSrc ? (
+                {previewBlob ? (
                   <img
                     className="detail-preview"
-                    src={previewSrc}
+                    src={previewBlob}
                     alt={title}
                   />
                 ) : (

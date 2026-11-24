@@ -293,6 +293,15 @@ class IconVisibilityTests(APITestCase):
         self.client.force_authenticate(self.author)
         self.assertEqual(self.listed_ids(), {"pub1", "mine1"})
 
+    def test_mine_lists_only_the_callers_icons(self):
+        self.client.force_authenticate(self.author)
+        response = self.client.get(reverse("icon-list"), {"mine": "1"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            {row["unique_id"] for row in list_rows(response)},
+            {"mine1"},
+        )
+
     def test_a_fresh_submission_is_retrievable_by_its_author(self):
         # Used to 404: create() forced pending, but retrieve only showed published.
         self.client.force_authenticate(self.author)
