@@ -1499,6 +1499,60 @@ button.site-nav__link {
   padding: 2.5rem 0 3rem;
 }
 
+/* Icon confetti (hero / about / contribute) — matches static site */
+
+.hero.has-confetti,
+.about.has-confetti,
+.contribute-teaser.has-confetti {
+  position: relative;
+  overflow: hidden;
+}
+
+.hero.has-confetti > *:not(.icon-confetti),
+.about.has-confetti > *:not(.icon-confetti),
+.contribute-teaser.has-confetti > *:not(.icon-confetti) {
+  position: relative;
+  z-index: 1;
+}
+
+.icon-confetti {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.icon-confetti img {
+  position: absolute;
+  height: auto;
+  opacity: 0.75;
+  filter: drop-shadow(0 6px 14px rgba(91, 61, 154, 0.22));
+  animation: confetti-float var(--dur, 8s) ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+  will-change: transform, opacity;
+  user-select: none;
+}
+
+@keyframes confetti-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(var(--rot, 0deg));
+    opacity: 0.48;
+  }
+  50% {
+    transform: translate3d(var(--dx, 28px), var(--dy, -40px), 0)
+      rotate(calc(var(--rot, 0deg) + 18deg));
+    opacity: 0.72;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon-confetti {
+    display: none;
+  }
+}
+
 .hero__logo {
   margin: 0 auto 1rem;
   border-radius: 0.5rem;

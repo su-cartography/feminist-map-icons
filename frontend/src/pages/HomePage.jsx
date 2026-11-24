@@ -8,6 +8,7 @@ import {
 import logo from '../assets/logo.png'
 import qgisPreview from '../assets/qgis-preview.png'
 import { useAuth } from '../auth'
+import IconConfetti, { useConfettiIcons } from '../components/IconConfetti'
 import { downloadPickedZip } from '../utils/zipDownload'
 
 const ABOUT_CARDS = [
@@ -63,6 +64,7 @@ export default function HomePage() {
   const location = useLocation()
   const navigate = useNavigate()
   const { token } = useAuth()
+  const confettiIcons = useConfettiIcons()
   const contributeTo = token ? '/contribute' : '/sign-in'
   // The URL is the source of truth for the search, so a back link or a
   // shared link lands on the same results.
@@ -226,7 +228,12 @@ export default function HomePage() {
 
   return (
     <div className="home">
-      <section className="hero wrap">
+      <section
+        className={
+          confettiIcons.length ? 'hero wrap has-confetti' : 'hero wrap'
+        }
+      >
+        <IconConfetti icons={confettiIcons} count={10} hostIndex={0} />
         <img className="hero__logo" src={logo} alt="" width={72} height={72} />
         <h1>
           Gallery of <em>Possibilities</em>
@@ -543,7 +550,14 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="about wrap" aria-labelledby="about-heading">
+      <section
+        id="about"
+        className={
+          confettiIcons.length ? 'about wrap has-confetti' : 'about wrap'
+        }
+        aria-labelledby="about-heading"
+      >
+        <IconConfetti icons={confettiIcons} count={8} hostIndex={1} />
         <h2 id="about-heading">About the galleryofpossibilities</h2>
         <ul className="about-grid">
           {ABOUT_CARDS.map((card) => (
@@ -555,7 +569,15 @@ export default function HomePage() {
         </ul>
       </section>
 
-      <section className="contribute-teaser wrap">
+      <section
+        id="contribute"
+        className={
+          confettiIcons.length
+            ? 'contribute-teaser wrap has-confetti'
+            : 'contribute-teaser wrap'
+        }
+      >
+        <IconConfetti icons={confettiIcons} count={6} hostIndex={2} />
         <h2>Contribute</h2>
         <p>Contribute feminist map icons to the gallery.</p>
         <Link className="btn" to={contributeTo}>
